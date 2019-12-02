@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>摄像头拍照</title>
+</head>
+<body>
+  <video id="video" width="640" height="480" controls>
+  </video>
+  <div>
+    <button id="capture">拍照</button>
+  </div>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+  <script>
+    //访问用户媒体设备的兼容方法
+    function getUserMedia(constraints, success, error) {
+      if (navigator.mediaDevices.getUserMedia) {
+        //最新的标准API
+        navigator.mediaDevices.getUserMedia(constraints).then(success).catch(error);
+      } else if (navigator.webkitGetUserMedia) {
+        //webkit核心浏览器
+        navigator.webkitGetUserMedia(constraints,success, error)
+      } else if (navigator.mozGetUserMedia) {
+        //firfox浏览器
+        navigator.mozGetUserMedia(constraints, success, error);
+      } else if (navigator.getUserMedia) {
+        //旧版API
+        navigator.getUserMedia(constraints, success, error);
+      }
+    }
+
+    function success(stream) {
+      //兼容webkit核心浏览器
+      let CompatibleURL = window.URL || window.webkitURL;
+      //将视频流设置为video元素的源
+      console.log(stream);
+
+      //video.src = CompatibleURL.createObjectURL(stream);
+      video.srcObject = stream;
+      video.play();
+    }
+
+    function error(error) {
+      console.log(`访问用户媒体设备失败${error.name}, ${error.message}`);
+    }
+
+    if (navigator.mediaDevices.getUserMedia || navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia) {
+      //调用用户媒体设备, 访问摄像头
+      getUserMedia({video : {width: 640, height: 480}}, success, error);
+    } else {
+      alert('不支持访问用户媒体');
+    }
+
+
+    let video = document.getElementById('video');
+    let canvas = document.getElementById('canvas');
+    let context = canvas.getContext('2d');
+
+    document.getElementById('capture').addEventListener('click', function () {
+      context.drawImage(video, 0, 0, 640, 480);      
+      //直接将canvas中的内容转化为base64格式，传入到需要显示的img中
+      var imgStr = canvas.toDataURL('image/jpeg'); // 不加image/jpeg会默认成png
+      //这里用formDate对象向后端传输文件完成交互
+      // var formDate = new FormData();
+      // formDate.append('image', convertBase64UrlToBlob(imgStr));
+      $.ajax({
+          method: 'POST',
+          // 没有tojson 会导致SCRIPT1012: SCRIPT1012: Expected '/'
+          url: {{ url_for('img_trans')|tojson }},
+          // data: formDate,
+          data: imgStr,
+          // dataType: 'json', # 指定接收消息格式, 未指定会自行判断
+          contentType: false,
+          processData: false,
+          success: function(result){
+              // alert(data.data);
+              console.log(`sucess', ${result.data}`);
+              // console.log(`imgdata, ${imgdata}`)
+          },
+        　error: function (XMLHttpRequest, textStatus, errorThrown) {
+    　　　　  console.log(`error:${XMLHttpRequest.status},${XMLHttpRequest.readyState},${textStatus}`);
+      　　}
+      });
+
+    },false)
+
+    // 这是一个转换base64的一个方法
+    function convertBase64UrlToBlob(urlData){
+      var bytes=window.atob(urlData.split(',')[1]);        //去掉url的头，并转换为byte
+      //处理异常,将ascii码小于0的转换为大于0
+      var ab = new ArrayBuffer(bytes.length);
+      var ia = new Uint8Array(ab);
+      for (var i = 0; i < bytes.length; i++) {
+          ia[i] = bytes.charCodeAt(i);
+      }
+      return new Blob( [ab] , {type : 'image/jpeg'});
+    }
+
+  </script>
+</body>
+</html>
